@@ -24,7 +24,7 @@ public class Game {
 		window.init();
 		window.setVisible(true);
 		
-		window.panel.startRepaintThread(this);
+		window.panel.startRepaintThread();
 	}
 	
 	protected void start() {

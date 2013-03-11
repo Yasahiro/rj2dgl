@@ -1,5 +1,6 @@
 package uk.co.marshmallow_zombies.rj2dgl.tilesets;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class TileLayer extends Layer {
@@ -12,6 +13,7 @@ public class TileLayer extends Layer {
 		this.name = name;
 		this.width = width;
 		this.height = height;
+		this.tiles = new ArrayList<Tile>();
 	}
 
 	public void addTile(Tile tile) {
@@ -28,6 +30,10 @@ public class TileLayer extends Layer {
 
 	public int getHeight() {
 		return height;
+	}
+
+	public Tile[] getTiles() {
+		return tiles.toArray(new Tile[tiles.size()]);
 	}
 
 };

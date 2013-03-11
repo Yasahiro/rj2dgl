@@ -22,7 +22,8 @@ public class Window extends JFrame implements WindowListener {
 		BufferedImage canvas;
 		long lastRender = System.nanoTime();
 
-		Panel() {
+		Panel(Game game) {
+			this.game = game;
 			canvas = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
 
 			setBackground(Color.BLACK);
@@ -30,9 +31,7 @@ public class Window extends JFrame implements WindowListener {
 			setLocation(0, 0);
 		}
 
-		void startRepaintThread(Game game) {
-			this.game = game;
-
+		void startRepaintThread() {
 			final Game finalGame = game;
 
 			Thread repaintThread = new Thread() {
@@ -52,7 +51,6 @@ public class Window extends JFrame implements WindowListener {
 						try {
 							Thread.sleep(20);
 						} catch (Exception e) {
-
 						}
 
 						lastTick = System.nanoTime();
@@ -69,14 +67,14 @@ public class Window extends JFrame implements WindowListener {
 			long now = System.nanoTime();
 			long delta = now - lastRender;
 
-			if (canvas == null)
+			if (canvas == null || game == null)
 				return;
 
 			setOpaque(true);
 			super.paintComponent(g);
 			g.drawImage(canvas, 0, 0, null);
 
-			game.render(canvas.getGraphics(), delta);
+			game.render(canvas.getGraphics(),delta);
 
 			lastRender = System.nanoTime();
 		}
@@ -87,7 +85,7 @@ public class Window extends JFrame implements WindowListener {
 
 	Window(Game game) {
 		this.game = game;
-		panel = new Panel();
+		panel = new Panel(game);
 	}
 
 	void init() {
