@@ -1,4 +1,4 @@
-package uk.co.marshmallow_zombies.rj2dgl.tilesets;
+package uk.co.marshmallow_zombies.tmxloader;
 
 import java.awt.image.BufferedImage;
 

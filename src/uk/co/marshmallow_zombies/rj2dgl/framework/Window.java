@@ -74,7 +74,7 @@ public class Window extends JFrame implements WindowListener {
 			super.paintComponent(g);
 			g.drawImage(canvas, 0, 0, null);
 
-			game.render(canvas.getGraphics(),delta);
+			game.render(canvas.getGraphics(), delta);
 
 			lastRender = System.nanoTime();
 		}
@@ -92,8 +92,11 @@ public class Window extends JFrame implements WindowListener {
 		add(panel);
 		setContentPane(panel);
 
+		Keyboard.listen();
+
 		setLocationRelativeTo(null);
 		addWindowListener(this);
+		addKeyListener(Keyboard.listener);
 
 		setDefaultCloseOperation(EXIT_ON_CLOSE);
 		setVisible(true);

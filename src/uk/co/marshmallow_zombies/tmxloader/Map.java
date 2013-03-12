@@ -1,6 +1,7 @@
-package uk.co.marshmallow_zombies.rj2dgl.tilesets;
+package uk.co.marshmallow_zombies.tmxloader;
 
 import java.awt.Color;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
@@ -8,22 +9,20 @@ import java.util.HashMap;
 import java.util.List;
 
 import javax.imageio.ImageIO;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.NodeList;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.input.SAXBuilder;
 
 import uk.co.marshmallow_zombies.rj2dgl.framework.Path;
 
 public class Map implements IPropertiesHolder {
 
+	private HashMap<String, String> properties;
+
 	private int width, height, tilewidth, tileheight;
 	private List<Tileset> tilesets;
 	private List<Layer> layers;
-	private HashMap<String, String> properties;
 	private Color backgroundColor;
 
 	public Map(int w, int h, int tilewidth, int tileheight, Color backgroundColor) {
@@ -31,74 +30,284 @@ public class Map implements IPropertiesHolder {
 		this.height = h;
 		this.tilewidth = tilewidth;
 		this.tileheight = tileheight;
+		this.properties = new HashMap<String, String>();
 		this.tilesets = new ArrayList<Tileset>();
 		this.layers = new ArrayList<Layer>();
-		this.properties = new HashMap<String, String>();
 		this.backgroundColor = backgroundColor;
 
 		System.out.printf("New map ready with size %dx%d\n", w, h);
 	}
 
+	/**
+	 * Adds a tileset to the map.
+	 * 
+	 * @param tileset
+	 *            The {@code Tileset} to add
+	 */
 	void addTileset(Tileset tileset) {
 		tilesets.add(tileset);
 	}
 
+	/**
+	 * Adds a property to the map.
+	 * 
+	 * @param name
+	 *            The name of the property.
+	 * @param value
+	 *            The value of the property.
+	 */
 	void addProperty(String name, String value) {
 		properties.put(name, value);
 	}
 
+	public MapObject[] getCollisionObject(Rectangle rect) {
+		List<MapObject> objects = new ArrayList<MapObject>();
+
+		// Iterate through the layers
+		for (int i = 0; i < layers.size(); i++) {
+			// Get the layer
+			Layer layer = layers.get(i);
+
+			// Is it an object group?
+			if (layer instanceof ObjectGroup) {
+				// We want all the objects
+				MapObject[] layerObjects = ((ObjectGroup) layer).getObjects();
+				for (int j = 0; j < layerObjects.length; j++) {
+					MapObject object = layerObjects[j];
+					// Does it have a GID?
+					if (object.hasGID()) {
+						// We need the tile width/height
+						Tileset tileset = getTilesetByGID(object.getGID());
+						int tilewidth = tileset.getTileWidth();
+						int tileheight = tileset.getTileHeight();
+						int objectx1 = object.getX();
+						int objecty1 = object.getY();
+						int objectx2 = tilewidth;
+						int objecty2 = tileheight;
+
+						Rectangle rectangle = new Rectangle(objectx1, objecty1, objectx2, objecty2);
+
+						if (rect.intersects(rectangle)) {
+							objects.add(object);
+						}
+					} else {
+						int objectx1 = object.getX();
+						int objecty1 = object.getY();
+						int objectx2 = object.getWidth();
+						int objecty2 = object.getHeight();
+
+						Rectangle rectangle = new Rectangle(objectx1, objecty1, objectx2, objecty2);
+
+						if (rect.intersects(rectangle)) {
+							objects.add(object);
+						}
+					}
+				}
+			}
+		}
+
+		return objects.toArray(new MapObject[objects.size()]);
+	}
+
+	public MapObject getObjectAtPoint(int x, int y, String layerName) {
+		// Iterate through the layers
+		for (int i = 0; i < layers.size(); i++) {
+			// Get the layer
+			Layer layer = layers.get(i);
+
+			// Is it an object group?
+			if (layer instanceof ObjectGroup) {
+				// Does the name match?
+				if (layer.getName().equals(layerName)) {
+					// We want all the objects
+					MapObject[] objects = ((ObjectGroup) layer).getObjects();
+					for (int j = 0; j < objects.length; j++) {
+						MapObject object = objects[j];
+
+						// Does it have a GID?
+						if (object.hasGID()) {
+							// We need the tile width/height
+							Tileset tileset = getTilesetByGID(object.getGID());
+							int tilewidth = tileset.getTileWidth();
+							int tileheight = tileset.getTileHeight();
+
+							// Scan by tile region
+							if (x >= object.getX() && x <= object.getX() + tilewidth && y >= object.getY()
+									&& y <= object.getY() + tileheight)
+								return object;
+						} else {
+							// Scan by object region
+							if (x >= object.getX() && x <= object.getX() + object.getWidth() && y >= object.getY()
+									&& y <= object.getY() + object.getHeight())
+								return object;
+						}
+					}
+				}
+			}
+		}
+
+		return null;
+	}
+
+	public MapObject getObjectAtPoint(int x, int y, int layerIndex) {
+		// Iterate through the layers
+		for (int i = 0; i < layers.size(); i++) {
+			// Get the layer
+			Layer layer = layers.get(i);
+
+			// Is it an object group?
+			if (layer instanceof ObjectGroup) {
+				// Does the name match?
+				if (layer.getLayerIndex() == layerIndex) {
+					// We want all the objects
+					MapObject[] objects = ((ObjectGroup) layer).getObjects();
+					for (int j = 0; j < objects.length; j++) {
+						MapObject object = objects[j];
+
+						// Does it have a GID?
+						if (object.hasGID()) {
+							// We need the tile width/height
+							Tileset tileset = getTilesetByGID(object.getGID());
+							int tilewidth = tileset.getTileWidth();
+							int tileheight = tileset.getTileHeight();
+
+							// Scan by tile region
+							if (x >= object.getX() && x <= object.getX() + tilewidth && y >= object.getY()
+									& y >= object.getY() + tileheight)
+								return object;
+						} else {
+							// Scan by object region
+							if (x >= object.getX() && x <= object.getX() + object.getWidth() && y >= object.getY()
+									&& y <= object.getY() + object.getHeight())
+								return object;
+						}
+					}
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Adds a layer to the map.
+	 * 
+	 * @param layer
+	 *            The {@code Layer} to add.
+	 */
 	void addLayer(Layer layer) {
 		layers.add(layer);
 	}
 
+	/**
+	 * Gets the map height in tiles.
+	 */
 	public int getHeight() {
 		return height;
 	}
 
+	/**
+	 * Gets the map width in tiles.
+	 */
 	public int getWidth() {
 		return width;
 	}
 
+	/**
+	 * Gets the tile height.
+	 */
 	public int getTileHeight() {
 		return tileheight;
 	}
 
+	/**
+	 * Gets the tile width.
+	 */
 	public int getTileWidth() {
 		return tilewidth;
 	}
 
+	/**
+	 * Gets the map background color.
+	 */
 	public Color getBackgroundColor() {
 		return backgroundColor;
 	}
 
+	/**
+	 * Gets the top-most layer on the map.
+	 * 
+	 * @return Returns the latest loaded {@code Layer}.
+	 */
+	public Layer getTopLayer() {
+		return layers.get(layers.size() - 1);
+	}
+
+	/**
+	 * Gets all the layers in the map.
+	 * 
+	 * @return Returns an array of type {@code Layer} representing the layers on
+	 *         the map.
+	 */
 	public Layer[] getLayers() {
 		return layers.toArray(new Layer[layers.size()]);
 	}
 
+	/**
+	 * Gets a string property.
+	 * 
+	 * @param name
+	 *            The name of the property.
+	 * @return Returns a {@code String} representing the property's value.
+	 */
 	public String getPropertyString(String name) {
 		try {
 			return properties.get(name);
 		} catch (Exception e) {
+			// No such property
 			return "";
 		}
 	}
 
+	/**
+	 * Gets an integer property.
+	 * 
+	 * @param name
+	 *            The name of the property.
+	 * @return Returns an {@code int} representing the property's value.
+	 */
 	public int getPropertyInteger(String name) {
 		try {
 			return Integer.valueOf(properties.get(name));
 		} catch (Exception e) {
+			// Wasn't an integer
 			return 0;
 		}
 	}
 
+	/**
+	 * Gets a float property.
+	 * 
+	 * @param name
+	 *            The name of the property.
+	 * @return Returns a {@code float} representing the property's value.
+	 */
 	public float getPropertyFloat(String name) {
 		try {
 			return Float.valueOf(properties.get(name));
 		} catch (Exception e) {
+			// Wasn't a float
 			return 0f;
 		}
 	}
 
+	/**
+	 * Gets a boolean property.
+	 * 
+	 * @param name
+	 *            The name of the property.
+	 * @return Returns a {@code boolean} representing the property's value.
+	 */
 	public boolean getPropertyBool(String name) {
 		try {
 			return Boolean.valueOf(properties.get(name));
@@ -107,81 +316,79 @@ public class Map implements IPropertiesHolder {
 		}
 	}
 
-	public static Map load(String mapFile) {
+	/**
+	 * Loads a non-encoded TMX map from file.
+	 * 
+	 * @param mapFile
+	 *            The file to read.
+	 * @return Returns a {@code Map} representing the map file.
+	 */
+	public static Map load(File mapFile) {
 		Map map = null;
 
 		try {
-			File file = new File(mapFile);
+			System.out.printf("Determined mapfile: %s\n", mapFile.getAbsolutePath());
 
-			System.out.printf("Determined mapfile: %s\n", file.getAbsolutePath());
+			// Get the document and root element
+			SAXBuilder builder = new SAXBuilder();
+			Document document = (Document) builder.build(mapFile);
+			Element mapElement = document.getRootElement();
 
-			/*
-			 * DocumentBuilderBuilder would've made a much better name. And for
-			 * that matter, where's my DocumentBuilderBuilderBuilder?
-			 */
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-			DocumentBuilder builder = factory.newDocumentBuilder();
-
-			Document document = builder.parse(file);
-
-			Element mapElement = document.getDocumentElement();
-			mapElement.normalize();
-
-			Color backgroundColor = Color.BLACK;
-			if (mapElement.hasAttribute("backgroundcolor")) {
-				String color = mapElement.getAttribute("backgroundcolor");
+			// Get map attributes
+			Color backgroundColor = new Color(128, 128, 128);
+			String color = mapElement.getAttributeValue("backgroundcolor");
+			if (color != null && !color.isEmpty())
 				backgroundColor = hex2Rgb(color);
-			}
-			int w = Integer.valueOf(mapElement.getAttribute("width"));
-			int h = Integer.valueOf(mapElement.getAttribute("height"));
-			int maptilewidth = Integer.valueOf(mapElement.getAttribute("tilewidth"));
-			int maptileheight = Integer.valueOf(mapElement.getAttribute("tileheight"));
+			int w = Integer.valueOf(mapElement.getAttributeValue("width"));
+			int h = Integer.valueOf(mapElement.getAttributeValue("height"));
+			int maptilewidth = Integer.valueOf(mapElement.getAttributeValue("tilewidth"));
+			int maptileheight = Integer.valueOf(mapElement.getAttributeValue("tileheight"));
+			int layerIndex = 0;
 
+			// Create a map
 			map = new Map(w, h, maptilewidth, maptileheight, backgroundColor);
 
-			// Get map's tilesets
-			NodeList mapProperties = mapElement.getElementsByTagName("properties");
-			System.out.printf("Loading properties\n", mapProperties.getLength());
+			List<Element> mapProperties = mapElement.getChildren("properties");
 
-			for (int i = 0; i < mapProperties.getLength(); i++) {
-				Element propertiesElement = (Element) mapProperties.item(i);
-				NodeList propertiesProperties = propertiesElement.getElementsByTagName("property");
+			for (int p = 0; p < mapProperties.size(); p++) {
+				Element propertiesElement = (Element) mapProperties.get(p);
+				List<Element> propertiesProperties = propertiesElement.getChildren("property");
+				for (int l = 0; l < propertiesProperties.size(); l++) {
+					Element propertyElement = (Element) propertiesProperties.get(l);
 
-				for (int j = 0; j < propertiesProperties.getLength(); j++) {
-					Element propertyElement = (Element) mapProperties.item(i);
-					NamedNodeMap properties = propertyElement.getAttributes();
-					for (int k = 0; k < properties.getLength(); k++) {
-						String name = properties.item(k).getNodeName();
-						String value = properties.item(k).getNodeValue();
+					String propertyName = propertyElement.getAttributeValue("name");
+					String propertyValue = propertyElement.getAttributeValue("value");
 
-						map.addProperty(name, value);
-					}
+					map.addProperty(propertyName, propertyValue);
 				}
 			}
 
+			if (mapProperties.size() == 0)
+				System.out.printf("Map has no custom properties\n", mapProperties.size());
+			else
+				System.out.printf("Loading %d map properties\n", mapProperties.size());
+
 			// Get map's tilesets
-			NodeList mapTilesets = mapElement.getElementsByTagName("tileset");
+			List<Element> mapTilesets = mapElement.getChildren("tileset");
 
-			System.out.printf("Found %d tilesets\n", mapTilesets.getLength());
+			for (int i = 0; i < mapTilesets.size(); i++) {
+				Element tilesetElement = (Element) mapTilesets.get(i);
 
-			for (int i = 0; i < mapTilesets.getLength(); i++) {
-				Element tilesetElement = (Element) mapTilesets.item(i);
-
-				int firstgid = Integer.valueOf(tilesetElement.getAttribute("firstgid"));
-				String name = tilesetElement.getAttribute("name");
-				int tilewidth = Integer.valueOf(tilesetElement.getAttribute("tilewidth"));
-				int tileheight = Integer.valueOf(tilesetElement.getAttribute("tileheight"));
+				int firstgid = Integer.valueOf(tilesetElement.getAttributeValue("firstgid"));
+				String name = tilesetElement.getAttributeValue("name");
+				int tilewidth = Integer.valueOf(tilesetElement.getAttributeValue("tilewidth"));
+				int tileheight = Integer.valueOf(tilesetElement.getAttributeValue("tileheight"));
 
 				Tileset tileset = new Tileset(firstgid, name, tilewidth, tileheight);
 
 				// Get tileset's images
-				NodeList tilesetImages = tilesetElement.getElementsByTagName("image");
-				for (int j = 0; j < tilesetImages.getLength(); j++) {
-					Element imageElement = (Element) tilesetImages.item(j);
+				List<Element> tilesetImages = tilesetElement.getChildren("image");
+				for (int j = 0; j < tilesetImages.size(); j++) {
+					Element imageElement = (Element) tilesetImages.get(j);
 
-					String source = imageElement.getAttribute("source");
+					String source = imageElement.getAttributeValue("source");
 
-					String path = Path.getDirectoryName(file.getAbsolutePath());
+					String path = Path.getDirectoryName(mapFile.getAbsolutePath());
 					path = String.format("%s/%s", path, source);
 					File imageFile = new File(path);
 
@@ -191,64 +398,216 @@ public class Map implements IPropertiesHolder {
 				map.addTileset(tileset);
 			}
 
-			NodeList mapLayers = mapElement.getChildNodes();
-			for (int i = 0; i < mapLayers.getLength(); i++) {
-				if (mapLayers.item(i).getNodeName().equalsIgnoreCase("layer")) {
-					Element layerElement = (Element) mapLayers.item(i);
+			System.out.printf("Loaded %d tilesets\n", mapTilesets.size());
 
-					String name = layerElement.getAttribute("name");
-					int width = Integer.valueOf(layerElement.getAttribute("width"));
-					int height = Integer.valueOf(layerElement.getAttribute("height"));
+			int layerCount = 0, objectGroupCount = 0;
 
-					TileLayer layer = new TileLayer(name, width, height);
+			// Now we need layers
+			List<Element> mapChildren = mapElement.getChildren();
+			for (int i = 0; i < mapChildren.size(); i++) {
+				// Get the current element
+				Element mapChild = mapChildren.get(i);
 
-					NodeList layerData = ((Element) mapElement).getElementsByTagName("data");
-					NodeList layerTiles = ((Element) layerData.item(0)).getElementsByTagName("tile");
+				// If we're working with a <layer>
+				if (mapChild.getName().equalsIgnoreCase("layer")) {
+					layerCount++;
 
-					for (int j = 0; j < layerTiles.getLength(); j++) {
-						Element tileElement = (Element) layerTiles.item(j);
+					// Get the attributes (name, width, height)
+					String name = mapChild.getAttributeValue("name");
+					int width = Integer.valueOf(mapChild.getAttributeValue("width"));
+					int height = Integer.valueOf(mapChild.getAttributeValue("height"));
+					String stropacity = mapChild.getAttributeValue("opacity");
+					float opacity = 1f;
 
-						int gid = Integer.valueOf(tileElement.getAttribute("gid"));
+					if (stropacity != null && !stropacity.isEmpty())
+						opacity = Float.valueOf(stropacity);
+
+					List<Element> layerProperties = mapElement.getChildren("properties");
+
+					for (int p = 0; p < layerProperties.size(); p++) {
+						Element propertiesElement = (Element) layerProperties.get(p);
+						List<Element> propertiesProperties = propertiesElement.getChildren("property");
+
+						for (int l = 0; l < propertiesProperties.size(); l++) {
+							Element propertyElement = (Element) propertiesProperties.get(l);
+
+							String propertyName = propertyElement.getAttributeValue("name");
+							String propertyValue = propertyElement.getAttributeValue("value");
+
+							map.addProperty(propertyName, propertyValue);
+						}
+					}
+
+					// Get the <data>/<tile> children
+					TileLayer layer = new TileLayer(++layerIndex, name, width, height);
+					Element layerData = mapChild.getChildren("data").get(0);
+					List<Element> layerTiles = layerData.getChildren("tile");
+
+					layer.setOpacity(opacity);
+
+					for (int t = 0; t < layerTiles.size(); t++) {
+						// Get the current <tile>
+						Element tileElement = layerTiles.get(t);
+
+						// Get attributes (gid)
+						int gid = Integer.valueOf(tileElement.getAttributeValue("gid"));
 
 						if (gid == 0) {
-							layer.addTile(Tile.EMPTY);
+							Tile tile = Tile.EMPTY;
+							tile.setParentLayer(layer);
+							layer.addTile(tile);
 						} else {
-							Tileset tileset = map.getTilesetByGID(gid);
-							int tilewidth = tileset.getTileWidth();
-							int tileheight = tileset.getTileHeight();
-							BufferedImage image = tileset.getImage();
+							// Get the image
+							BufferedImage image = map.getImageByGID(gid);
 
-							int tilegid = gid % tileset.getFirstGID();
-
-							// Useful calculation to turn INDEX into
-							// X/Y-coordinates
-							// and vice-versa
-							// i = x + (y * w)
-							// x = i % w
-							// y = i / w
-							int x = tilegid % (image.getWidth() / tileheight);
-							int y = tilegid / (image.getHeight() / tileheight);
-
-							image = image.getSubimage(x * tilewidth, y * tileheight, tilewidth, tileheight);
-
-							Tile tile = new Tile(gid, image);
+							// Create a new tile and add it
+							Tile tile = new Tile(layer, gid, image);
 							layer.addTile(tile);
 						}
 					}
-					
+
 					map.addLayer(layer);
-				} else if (mapLayers.item(i).getNodeName().equalsIgnoreCase("objectgroup")) {
+				} else if (mapChild.getName().equalsIgnoreCase("objectgroup")) {
+					objectGroupCount++;
+
+					// Get the attributes (name, width, height)
+					String name = mapChild.getAttributeValue("name");
+					int width = Integer.valueOf(mapChild.getAttributeValue("width"));
+					int height = Integer.valueOf(mapChild.getAttributeValue("height"));
+					String stropacity = mapChild.getAttributeValue("opacity");
+					float opacity = 1f;
+
+					if (stropacity != null && !stropacity.isEmpty())
+						opacity = Float.valueOf(stropacity);
+
+					List<Element> layerProperties = mapElement.getChildren("properties");
+
+					for (int p = 0; p < layerProperties.size(); p++) {
+						Element propertiesElement = (Element) layerProperties.get(p);
+						List<Element> propertiesProperties = propertiesElement.getChildren("property");
+
+						for (int l = 0; l < propertiesProperties.size(); l++) {
+							Element propertyElement = (Element) propertiesProperties.get(l);
+
+							String propertyName = propertyElement.getAttributeValue("name");
+							String propertyValue = propertyElement.getAttributeValue("value");
+							map.addProperty(propertyName, propertyValue);
+						}
+					}
+
+					ObjectGroup objectgroup = new ObjectGroup(++layerIndex, name, width, height);
+					objectgroup.setOpacity(opacity);
+
+					// Get the <object> children
+					List<Element> layerObjects = mapChild.getChildren("object");
+					for (int j = 0; j < layerObjects.size(); j++) {
+						Element layerObject = layerObjects.get(j);
+
+						// Get <object> attributes
+						String strObjectName = layerObject.getAttributeValue("name");
+						String strObjectType = layerObject.getAttributeValue("type");
+						String strObjectGID = layerObject.getAttributeValue("gid");
+						String strObjectX = layerObject.getAttributeValue("x");
+						String strObjectY = layerObject.getAttributeValue("y");
+						String strObjectWidth = layerObject.getAttributeValue("width");
+						String strObjectHeight = layerObject.getAttributeValue("height");
+
+						// Convert known attributes
+						int objectX = Integer.valueOf(strObjectX);
+						int objectY = Integer.valueOf(strObjectY);
+
+						// And fill in ones we don't know
+						int objectGID = -1;
+						int objectWidth = -1;
+						int objectHeight = -1;
+
+						// Now check if they exist
+						if (strObjectGID != null && !strObjectGID.isEmpty())
+							// object gid
+							objectGID = Integer.valueOf(strObjectGID);
+						if (strObjectWidth != null && !strObjectWidth.isEmpty())
+							// object width
+							objectWidth = Integer.valueOf(strObjectWidth);
+						if (strObjectHeight != null && !strObjectHeight.isEmpty())
+							// object height
+							objectHeight = Integer.valueOf(strObjectHeight);
+
+						// And now we can create the object
+						MapObject object = new MapObject(objectgroup, strObjectName, strObjectType, objectGID, objectX,
+								objectY, objectWidth, objectHeight);
+
+						if (object.hasGID()) {
+							int gid = object.getGID();
+
+							// Get and set the image
+							BufferedImage image = map.getImageByGID(gid);
+							object.setImage(image);
+						}
+
+						List<Element> objectProperties = layerObject.getChildren("properties");
+						for (int p = 0; p < objectProperties.size(); p++) {
+							Element propertiesElement = (Element) objectProperties.get(p);
+							List<Element> propertiesProperties = propertiesElement.getChildren("property");
+
+							for (int l = 0; l < propertiesProperties.size(); l++) {
+								Element propertyElement = (Element) propertiesProperties.get(l);
+
+								String propertyName = propertyElement.getAttributeValue("name");
+								String propertyValue = propertyElement.getAttributeValue("value");
+								if (propertyName != null && propertyValue != null)
+									object.addProperty(propertyName, propertyValue);
+							}
+						}
+
+						// Add it to the layer
+						objectgroup.addObject(object);
+					}
+
+					map.addLayer(objectgroup);
 				}
 			}
+			System.out.printf("Loaded %d layers and %d objectgroups\n", layerCount, objectGroupCount);
 		} catch (Exception e) {
 			e.printStackTrace();
 			map = null;
 		}
 
+		System.out.printf("Map fully loaded\n");
+
 		return map;
 	}
 
-	public Tileset getTilesetByGID(int gid) {
+	BufferedImage getImageByGID(int gid) {
+		// Get the tileset that owns 'gid'
+		Tileset tileset = getTilesetByGID(gid);
+
+		// Get the tile width, tile height and image of the
+		// tileset
+		int tileWidth = tileset.getTileWidth();
+		int tileHeight = tileset.getTileHeight();
+		BufferedImage image = tileset.getImage();
+
+		// Get the GID relative to the tileset
+		int firstgid = tileset.getFirstGID();
+		int tileGID = gid % firstgid;
+		if (firstgid == 1) {
+			tileGID = gid / firstgid;
+		}
+
+		// Useful calculation to turn INDEX into
+		// X/Y-coordinates
+		// and vice-versa
+		// i = x + (y * w)
+		// x = i % w
+		// y = i / w
+		int x = tileGID % (image.getWidth() / tileHeight);
+		int y = tileGID / (image.getHeight() / tileHeight);
+
+		// Crop the image
+		return image.getSubimage(x * tileWidth, y * tileHeight, tileWidth, tileHeight);
+	}
+
+	Tileset getTilesetByGID(int gid) {
 		for (int i = 0; i < tilesets.size(); i++) {
 			Tileset tileset = tilesets.get(i);
 			int firstgid, lastgid;
@@ -259,7 +618,7 @@ public class Map implements IPropertiesHolder {
 			int tilewidth = tileset.getTileWidth();
 			int tileheight = tileset.getTileHeight();
 
-			lastgid = firstgid + ((width / tilewidth) * (height / tileheight));
+			lastgid = firstgid + ((width / tilewidth) * (height / tileheight)) - 1;
 
 			if (gid >= firstgid && gid <= lastgid) {
 				return tileset;
@@ -269,6 +628,13 @@ public class Map implements IPropertiesHolder {
 		return null;
 	}
 
+	/**
+	 * Converts a string hexadecimal color into a {@code java.awt.Color}.
+	 * 
+	 * @param colorStr
+	 *            The hexadecimal color (is acceptable with or without a '#')
+	 * @return Returns a {@code Color} which best represents {@code colorStr}.
+	 */
 	static Color hex2Rgb(String colorStr) {
 		if (!colorStr.startsWith("#")) {
 			colorStr = String.format("#%s", colorStr);
