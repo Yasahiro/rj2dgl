@@ -28,8 +28,8 @@ public class Screen {
 
 		c.canvas = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
 		window.pack();
-		
 		window.centre(false);
+		window.pack();
 	}
 
 	public int[] getSize() {

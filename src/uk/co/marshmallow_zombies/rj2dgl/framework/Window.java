@@ -96,10 +96,11 @@ public class Window extends JFrame implements WindowListener {
 
 		setLocationRelativeTo(null);
 		addWindowListener(this);
-		addKeyListener(Keyboard.listener);
+		addKeyListener(Keyboard.getListener());
 
 		setDefaultCloseOperation(EXIT_ON_CLOSE);
 		setVisible(true);
+		setResizable(false);
 	}
 
 	void centre(boolean tk) {

@@ -2,32 +2,57 @@ package uk.co.marshmallow_zombies.rj2dgl.framework;
 
 import java.util.List;
 
+/**
+ * The {@code Keyboard} class acts as a middle-man between the game and the
+ * keyboard states.
+ * 
+ * @author Oliver Davenport (12033278)
+ */
 public class Keyboard {
 
-	static KeyboardInputListener listener;
+	// The keyboard listening class
+	private static KeyboardInputListener listener;
 
+	/**
+	 * Begins the keyboard listener.
+	 */
 	static void listen() {
+		// Instantiate the listener
 		listener = new KeyboardInputListener();
-	}	
-
-	public static KeyState getKeyState(Keys key) {
-		return isKeyDown(key) ? KeyState.DOWN : KeyState.UP;
 	}
 
-	public static Keys[] getPressedKeys() {
-		Keys[] keys;
-		List<Keys> list = listener.getKeyList();
-		keys = list.toArray(new Keys[list.size()]);
-		return keys;
+	/**
+	 * Gets the keyboard listener used by this instance.
+	 * 
+	 * @return Returns the {@code KeyboardInputListener} used by the instance.
+	 */
+	static KeyboardInputListener getListener() {
+		// Return the listener
+		return listener;
 	}
 
-	public static boolean isKeyDown(Keys key) {
-		List<Keys> keys = listener.getKeyList();
-		return keys.contains(key);
-	}
+	/**
+	 * Gets the state of the keyboard.
+	 * 
+	 * @return Returns a {@code KeyboardState} instance which represents the
+	 *         current state of the keyboard.
+	 */
+	public static KeyboardState getState() {
+		try {
+			// Collect the list of pressed keys
+			List<Keys> list = listener.getKeyList();
 
-	public static boolean isKeyUp(Keys key) {
-		return !isKeyDown(key);
+			// Cast the lsit to an array
+			Keys[] keys = list.toArray(new Keys[list.size()]);
+
+			// Create a new state object for the keyboard
+			KeyboardState state = new KeyboardState(keys);
+
+			// Return the state
+			return state;
+		} catch (Exception e) {
+			return null;
+		}
 	}
 
 };

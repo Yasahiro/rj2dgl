@@ -24,6 +24,10 @@ public class Vector2 {
 		this.y = y;
 	}
 
+	public Vector2 clone() {
+		return new Vector2(this.x, this.y);
+	}
+
 	public void add(Vector2 v) {
 		this.x += v.x;
 		this.y += v.y;
